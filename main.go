@@ -41,7 +41,10 @@ func main() {
 	defer dockerHandler.Close()
 	log.Println("setup DockerHandler ... success")
 
-	if err := streamClient.ClamAction(dockerHandler.HandleAction); err != nil {
+	if err := streamClient.ClamCompanyAction(dockerHandler.HandleAction); err != nil {
+		log.Fatalln(err)
+	}
+	if err := streamClient.ClamSharedAction(dockerHandler.HandleAction); err != nil {
 		log.Fatalln(err)
 	}
 

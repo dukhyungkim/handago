@@ -6,6 +6,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"google.golang.org/protobuf/proto"
 	"handago/config"
+	"log"
 	"strings"
 	"time"
 )
@@ -42,11 +43,30 @@ func (s *Client) PublishResponse(response *pbAct.ActionResponse) error {
 	return nil
 }
 
-type ActionHandler func(subject string, data []byte)
+type ActionHandler func(request *pbAct.ActionRequest)
 
-func (s *Client) ClamAction(handler ActionHandler) error {
-	if _, err := s.nc.QueueSubscribe("harago.action", "handago", func(msg *nats.Msg) {
-		handler(msg.Subject, msg.Data)
+func (s *Client) ClamCompanyAction(handler ActionHandler) error {
+	if _, err := s.nc.QueueSubscribe("harago.company.action", "handago", func(msg *nats.Msg) {
+		var request pbAct.ActionRequest
+		if err := proto.Unmarshal(msg.Data, &request); err != nil {
+			log.Println(err)
+			return
+		}
+		handler(&request)
+	}); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *Client) ClamSharedAction(handler ActionHandler) error {
+	if _, err := s.nc.Subscribe("harago.shared.action", func(msg *nats.Msg) {
+		var request pbAct.ActionRequest
+		if err := proto.Unmarshal(msg.Data, &request); err != nil {
+			log.Println(err)
+			return
+		}
+		handler(&request)
 	}); err != nil {
 		return err
 	}

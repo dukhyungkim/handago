@@ -6,7 +6,6 @@ import (
 	"fmt"
 	pbAct "github.com/dukhyungkim/libharago/gen/go/proto/action"
 	clientv3 "go.etcd.io/etcd/client/v3"
-	"google.golang.org/protobuf/proto"
 	"handago/common"
 	"handago/config"
 	tm "handago/handler/template_model"
@@ -37,20 +36,15 @@ func NewDockerHandler(cfg *config.Etcd, streamClient *stream.Client) (*Docker, e
 	return &Docker{etcdClient: etcdClient, streamClient: streamClient}, nil
 }
 
-func (d *Docker) HandleAction(_ string, data []byte) {
-	var pbAction pbAct.ActionRequest
-	if err := proto.Unmarshal(data, &pbAction); err != nil {
-		log.Println(err)
-		return
-	}
-	log.Println("Data:", pbAction.String())
+func (d *Docker) HandleAction(request *pbAct.ActionRequest) {
+	log.Println("Request:", request.String())
 
-	deployTeemplateParam := tm.NewDeployTemplate(pbAction.GetReqDeploy())
+	deployTemplateParam := tm.NewDeployTemplate(request.GetReqDeploy())
 
 	ctx, cancel := context.WithTimeout(context.Background(), common.DefaultTimeout)
 	defer cancel()
 
-	deployKey := fmt.Sprintf("/%s", deployTeemplateParam.Name)
+	deployKey := fmt.Sprintf("/%s", deployTemplateParam.Name)
 	deployTemplate, err := d.etcdClient.Get(ctx, deployKey)
 	if err != nil {
 		log.Println(fmt.Errorf("failed to get kv; %w", err))
@@ -61,19 +55,19 @@ func (d *Docker) HandleAction(_ string, data []byte) {
 		log.Println(fmt.Errorf("failed to find value from key: %s", deployKey))
 	}
 
-	tpl, err := template.New(deployTeemplateParam.Name).Parse(string(deployTemplate.Kvs[0].Value))
+	tpl, err := template.New(deployTemplateParam.Name).Parse(string(deployTemplate.Kvs[0].Value))
 	if err != nil {
 		log.Println(err)
 		return
 	}
 
 	var tplBuffer bytes.Buffer
-	if err = tpl.Execute(&tplBuffer, deployTeemplateParam); err != nil {
+	if err = tpl.Execute(&tplBuffer, deployTemplateParam); err != nil {
 		log.Println(err)
 		return
 	}
 
-	tplPath := fmt.Sprintf("/tmp/%s.yaml", deployTeemplateParam.Name)
+	tplPath := fmt.Sprintf("/tmp/%s.yaml", deployTemplateParam.Name)
 	if err = ioutil.WriteFile(tplPath, tplBuffer.Bytes(), 0644); err != nil {
 		log.Println(err)
 		return
@@ -97,11 +91,11 @@ func (d *Docker) HandleAction(_ string, data []byte) {
 		return
 	}
 
-	pbResponse := &pbAct.ActionResponse{
+	response := &pbAct.ActionResponse{
 		Text:  string(output),
-		Space: pbAction.GetSpace(),
+		Space: request.GetSpace(),
 	}
-	if err = d.streamClient.PublishResponse(pbResponse); err != nil {
+	if err = d.streamClient.PublishResponse(response); err != nil {
 		log.Println(err)
 		return
 	}
