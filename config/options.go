@@ -7,6 +7,7 @@ type Options struct {
 	Etcd       bool   `long:"etcd" description:"read config from etcd"`
 	Company    string `long:"company" description:"use company subscriber"`
 	Shared     bool   `long:"shared" description:"use shared subscriber"`
+	Host       string `long:"host" description:"host url"`
 }
 
 func ParseFlags() (*Options, error) {

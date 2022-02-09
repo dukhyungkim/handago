@@ -15,3 +15,17 @@ func NewDeployTemplate(request *pbAct.ActionRequest_DeployRequest) *DeployTempla
 		ResourceURL: request.GetResourceUrl(),
 	}
 }
+
+type CompanyDeployTemplate struct {
+	Company string
+	Host    string
+	*DeployTemplate
+}
+
+func NewCompanyDeployTemplate(company string, host string, request *pbAct.ActionRequest_DeployRequest) *CompanyDeployTemplate {
+	return &CompanyDeployTemplate{
+		Company:        company,
+		Host:           host,
+		DeployTemplate: NewDeployTemplate(request),
+	}
+}

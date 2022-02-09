@@ -22,6 +22,10 @@ func main() {
 		log.Fatalln(err)
 	}
 
+	if opts.Shared == false && opts.Company == "" {
+		log.Fatalln("--shared or --company must be set")
+	}
+
 	cfg, err := config.NewConfig(opts)
 	if err != nil {
 		log.Fatalln(err)
@@ -41,11 +45,16 @@ func main() {
 	defer dockerHandler.Close()
 	log.Println("setup DockerHandler ... success")
 
-	if err := streamClient.ClamCompanyAction(dockerHandler.HandleAction); err != nil {
-		log.Fatalln(err)
+	if opts.Shared {
+		if err := streamClient.ClamSharedAction(dockerHandler.HandleAction); err != nil {
+			log.Fatalln(err)
+		}
 	}
-	if err := streamClient.ClamSharedAction(dockerHandler.HandleAction); err != nil {
-		log.Fatalln(err)
+
+	if opts.Company != "" {
+		if err := streamClient.ClamCompanyAction(opts.Company, opts.Host, dockerHandler.HandleCompanyAction); err != nil {
+			log.Fatalln(err)
+		}
 	}
 
 	waitSignal()

@@ -43,21 +43,40 @@ func (s *Client) PublishResponse(response *pbAct.ActionResponse) error {
 	return nil
 }
 
-type ActionHandler func(request *pbAct.ActionRequest)
+type CompanyActionHandler func(company string, host string, request *pbAct.ActionRequest)
 
-func (s *Client) ClamCompanyAction(handler ActionHandler) error {
-	if _, err := s.nc.QueueSubscribe("harago.company.action", "handago", func(msg *nats.Msg) {
+func (s *Client) ClamCompanyAction(company string, host string, handler CompanyActionHandler) error {
+	if _, err := s.nc.Subscribe("harago.company.action", func(msg *nats.Msg) {
 		var request pbAct.ActionRequest
 		if err := proto.Unmarshal(msg.Data, &request); err != nil {
 			log.Println(err)
 			return
 		}
-		handler(&request)
+
+		log.Println("Request:", request.String())
+		handler(company, host, &request)
 	}); err != nil {
 		return err
 	}
+
+	specialSubject := fmt.Sprintf("harago.%s.action", company)
+	if _, err := s.nc.QueueSubscribe(specialSubject, "handago", func(msg *nats.Msg) {
+		var request pbAct.ActionRequest
+		if err := proto.Unmarshal(msg.Data, &request); err != nil {
+			log.Println(err)
+			return
+		}
+
+		log.Println("Request:", request.String())
+		handler(company, host, &request)
+	}); err != nil {
+		return err
+	}
+
 	return nil
 }
+
+type ActionHandler func(request *pbAct.ActionRequest)
 
 func (s *Client) ClamSharedAction(handler ActionHandler) error {
 	if _, err := s.nc.Subscribe("harago.shared.action", func(msg *nats.Msg) {
@@ -66,6 +85,8 @@ func (s *Client) ClamSharedAction(handler ActionHandler) error {
 			log.Println(err)
 			return
 		}
+
+		log.Println("Request:", request.String())
 		handler(&request)
 	}); err != nil {
 		return err

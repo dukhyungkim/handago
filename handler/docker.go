@@ -36,73 +36,98 @@ func NewDockerHandler(cfg *config.Etcd, streamClient *stream.Client) (*Docker, e
 	return &Docker{etcdClient: etcdClient, streamClient: streamClient}, nil
 }
 
+func (d *Docker) Close() {
+	if err := d.etcdClient.Close(); err != nil {
+		log.Printf("failed to close etcd client cleany; %v\n", err)
+	}
+}
+
 func (d *Docker) HandleAction(request *pbAct.ActionRequest) {
-	log.Println("Request:", request.String())
+	templateParam := tm.NewDeployTemplate(request.GetReqDeploy())
 
-	deployTemplateParam := tm.NewDeployTemplate(request.GetReqDeploy())
+	d.deploy(templateParam.Name, request.GetSpace(), templateParam)
+}
 
-	ctx, cancel := context.WithTimeout(context.Background(), common.DefaultTimeout)
-	defer cancel()
+func (d *Docker) HandleCompanyAction(company string, host string, request *pbAct.ActionRequest) {
+	templateParam := tm.NewCompanyDeployTemplate(company, host, request.GetReqDeploy())
 
-	deployKey := fmt.Sprintf("/%s", deployTemplateParam.Name)
-	deployTemplate, err := d.etcdClient.Get(ctx, deployKey)
+	d.deploy(templateParam.Name, request.GetSpace(), templateParam)
+}
+
+func (d *Docker) deploy(name string, space string, templateParam interface{}) {
+	deployTemplate, err := d.loadTemplate(name)
 	if err != nil {
-		log.Println(fmt.Errorf("failed to get kv; %w", err))
+		log.Println(err)
 		return
 	}
 
-	if len(deployTemplate.Kvs) == 0 {
-		log.Println(fmt.Errorf("failed to find value from key: %s", deployKey))
-	}
-
-	tpl, err := template.New(deployTemplateParam.Name).Parse(string(deployTemplate.Kvs[0].Value))
+	tpl, err := template.New(name).Parse(deployTemplate)
 	if err != nil {
-		log.Println(err)
+		log.Printf("failed to create template; %v\n", err)
 		return
 	}
 
 	var tplBuffer bytes.Buffer
-	if err = tpl.Execute(&tplBuffer, deployTemplateParam); err != nil {
-		log.Println(err)
+	if err = tpl.Execute(&tplBuffer, templateParam); err != nil {
+		log.Println("failed to apply template ", err)
 		return
 	}
 
-	tplPath := fmt.Sprintf("/tmp/%s.yaml", deployTemplateParam.Name)
-	if err = ioutil.WriteFile(tplPath, tplBuffer.Bytes(), 0644); err != nil {
-		log.Println(err)
+	output, err := d.executeDockerCompose(name, tplBuffer)
+	if err != nil {
+		log.Printf("failed to execute docker-compose; %v\n", err)
 		return
+	}
+
+	d.sendResponse(space, output, err)
+}
+
+func (d *Docker) executeDockerCompose(name string, tplBuffer bytes.Buffer) (string, error) {
+	tplPath := fmt.Sprintf("/tmp/%s.yaml", name)
+	if err := ioutil.WriteFile(tplPath, tplBuffer.Bytes(), 0644); err != nil {
+		return "", err
 	}
 
 	const cmdDockerCompose = "docker-compose"
 
-	if err = exec.Command(cmdDockerCompose, "-f", tplPath, "up", "-d").Run(); err != nil {
-		log.Println(err)
-		return
+	if err := exec.Command(cmdDockerCompose, "-f", tplPath, "up", "-d").Run(); err != nil {
+		return "", err
 	}
 
 	output, err := exec.Command(cmdDockerCompose, "-f", tplPath, "ps").Output()
 	if err != nil {
-		log.Println(err)
-		return
+		return "", err
 	}
 
 	if err = os.Remove(tplPath); err != nil {
-		log.Println(err)
-		return
+		return "", err
+	}
+	return string(output), err
+}
+
+func (d *Docker) loadTemplate(name string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), common.DefaultTimeout)
+	defer cancel()
+
+	deployKey := fmt.Sprintf("/%s", name)
+	deployTemplate, err := d.etcdClient.Get(ctx, deployKey)
+	if err != nil {
+		return "", err
 	}
 
+	if len(deployTemplate.Kvs) == 0 {
+		return "", fmt.Errorf("failed to find value from key: %s", deployKey)
+	}
+	return string(deployTemplate.Kvs[0].Value), nil
+}
+
+func (d *Docker) sendResponse(space string, output string, err error) {
 	response := &pbAct.ActionResponse{
-		Text:  string(output),
-		Space: request.GetSpace(),
+		Text:  output,
+		Space: space,
 	}
 	if err = d.streamClient.PublishResponse(response); err != nil {
 		log.Println(err)
 		return
-	}
-}
-
-func (d *Docker) Close() {
-	if err := d.etcdClient.Close(); err != nil {
-		log.Printf("failed to close etcd client cleany; %v\n", err)
 	}
 }
