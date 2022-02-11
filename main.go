@@ -22,7 +22,7 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	if opts.Shared == false && opts.Company == "" {
+	if !opts.Shared && opts.Company == "" {
 		log.Fatalln("--shared or --company must be set")
 	}
 

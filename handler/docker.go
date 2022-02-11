@@ -79,7 +79,7 @@ func (d *Docker) deploy(name string, space string, templateParam interface{}) {
 		return
 	}
 
-	d.sendResponse(space, output, err)
+	d.sendResponse(space, output)
 }
 
 func (d *Docker) executeDockerCompose(name string, tplBuffer bytes.Buffer) (string, error) {
@@ -121,12 +121,12 @@ func (d *Docker) loadTemplate(name string) (string, error) {
 	return string(deployTemplate.Kvs[0].Value), nil
 }
 
-func (d *Docker) sendResponse(space string, output string, err error) {
+func (d *Docker) sendResponse(space string, output string) {
 	response := &pbAct.ActionResponse{
 		Text:  output,
 		Space: space,
 	}
-	if err = d.streamClient.PublishResponse(response); err != nil {
+	if err := d.streamClient.PublishResponse(response); err != nil {
 		log.Println(err)
 		return
 	}

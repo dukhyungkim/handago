@@ -36,7 +36,7 @@ func (s *Client) PublishResponse(response *pbAct.ActionResponse) error {
 		return err
 	}
 
-	subject := fmt.Sprintf("handago.response")
+	const subject = "handago.response"
 	if err := s.nc.Publish(subject, b); err != nil {
 		return err
 	}
