@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+
+env:
+  GOPRIVATE: github.com/dukhyungkim
+  REGISTRY: harbor.brique.kr
+  IMAGE_NAME: chatbot/handago
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Configure git for private modules
+        env:
+          GOPRIVATE_TOKEN: ${{ secrets.GOPRIVATE_TOKEN }}
+        run: git config --global url."https://x-access-token:${GOPRIVATE_TOKEN}@github.com".insteadOf "https://github.com"
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v2.5.2
+        with:
+          version: latest
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [lint]
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup Go environment
+        uses: actions/setup-go@v2.1.5
+        with:
+          go-version: 1.17
+
+      - name: Configure git for private modules
+        env:
+          GOPRIVATE_TOKEN: ${{ secrets.GOPRIVATE_TOKEN }}
+        run: git config --global url."https://x-access-token:${GOPRIVATE_TOKEN}@github.com".insteadOf "https://github.com"
+
+      - name: Run build
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: build-artifact
+          path: handago
+          retention-days: 7
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Download a single artifact
+      uses: actions/download-artifact@v2
+      with:
+        name: build-artifact
+
+    - name: Log in to the Container registry
+      uses: docker/login-action@v1
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ secrets.DOCKER_REPO_USERNAME }}
+        password: ${{ secrets.DOCKER_REPO_TOKEN }}
+
+    - name: Build and push
+      id: docker_build
+      uses: docker/build-push-action@v2
+      with:
+        context: .
+        push: true
+        tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.run_number }}
