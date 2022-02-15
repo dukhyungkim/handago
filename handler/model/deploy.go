@@ -1,4 +1,4 @@
-package template_model
+package model
 
 import (
 	pbAct "github.com/dukhyungkim/libharago/gen/go/proto/action"
@@ -22,7 +22,7 @@ type CompanyDeployTemplate struct {
 	*DeployTemplate
 }
 
-func NewCompanyDeployTemplate(company string, host string, request *pbAct.ActionRequest_DeployRequest) *CompanyDeployTemplate {
+func NewCompanyDeployTemplate(company, host string, request *pbAct.ActionRequest_DeployRequest) *CompanyDeployTemplate {
 	return &CompanyDeployTemplate{
 		Company:        company,
 		Host:           host,

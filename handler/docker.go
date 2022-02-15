@@ -8,10 +8,9 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"handago/common"
 	"handago/config"
-	tm "handago/handler/template_model"
+	tm "handago/handler/model"
 	"handago/stream"
 	"html/template"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -48,13 +47,13 @@ func (d *Docker) HandleAction(request *pbAct.ActionRequest) {
 	d.deploy(templateParam.Name, request.GetSpace(), templateParam)
 }
 
-func (d *Docker) HandleCompanyAction(company string, host string, request *pbAct.ActionRequest) {
+func (d *Docker) HandleCompanyAction(company, host string, request *pbAct.ActionRequest) {
 	templateParam := tm.NewCompanyDeployTemplate(company, host, request.GetReqDeploy())
 
 	d.deploy(templateParam.Name, request.GetSpace(), templateParam)
 }
 
-func (d *Docker) deploy(name string, space string, templateParam interface{}) {
+func (d *Docker) deploy(name, space string, templateParam interface{}) {
 	deployTemplate, err := d.loadTemplate(name)
 	if err != nil {
 		log.Println(err)
@@ -84,7 +83,7 @@ func (d *Docker) deploy(name string, space string, templateParam interface{}) {
 
 func (d *Docker) executeDockerCompose(name string, tplBuffer bytes.Buffer) (string, error) {
 	tplPath := fmt.Sprintf("/tmp/%s.yaml", name)
-	if err := ioutil.WriteFile(tplPath, tplBuffer.Bytes(), 0644); err != nil {
+	if err := os.WriteFile(tplPath, tplBuffer.Bytes(), 0644); err != nil {
 		return "", err
 	}
 
@@ -99,7 +98,8 @@ func (d *Docker) executeDockerCompose(name string, tplBuffer bytes.Buffer) (stri
 		return "", err
 	}
 
-	if err = os.Remove(tplPath); err != nil {
+	err = os.Remove(tplPath)
+	if err != nil {
 		return "", err
 	}
 	return string(output), err
@@ -121,7 +121,7 @@ func (d *Docker) loadTemplate(name string) (string, error) {
 	return string(deployTemplate.Kvs[0].Value), nil
 }
 
-func (d *Docker) sendResponse(space string, output string) {
+func (d *Docker) sendResponse(space, output string) {
 	response := &pbAct.ActionResponse{
 		Text:  output,
 		Space: space,

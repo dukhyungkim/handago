@@ -40,20 +40,20 @@ func main() {
 
 	dockerHandler, err := handler.NewDockerHandler(cfg.Etcd, streamClient)
 	if err != nil {
-		log.Fatalln(err)
+		log.Panicln(err)
 	}
 	defer dockerHandler.Close()
 	log.Println("setup DockerHandler ... success")
 
 	if opts.Shared {
 		if err := streamClient.ClamSharedAction(dockerHandler.HandleAction); err != nil {
-			log.Fatalln(err)
+			log.Panicln(err)
 		}
 	}
 
 	if opts.Company != "" {
 		if err := streamClient.ClamCompanyAction(opts.Company, opts.Host, dockerHandler.HandleCompanyAction); err != nil {
-			log.Fatalln(err)
+			log.Panicln(err)
 		}
 	}
 

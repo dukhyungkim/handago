@@ -45,7 +45,7 @@ func (s *Client) PublishResponse(response *pbAct.ActionResponse) error {
 
 type CompanyActionHandler func(company string, host string, request *pbAct.ActionRequest)
 
-func (s *Client) ClamCompanyAction(company string, host string, handler CompanyActionHandler) error {
+func (s *Client) ClamCompanyAction(company, host string, handler CompanyActionHandler) error {
 	if _, err := s.nc.Subscribe("harago.company.action", func(msg *nats.Msg) {
 		var request pbAct.ActionRequest
 		if err := proto.Unmarshal(msg.Data, &request); err != nil {
