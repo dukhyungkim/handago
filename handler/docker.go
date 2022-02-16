@@ -83,7 +83,7 @@ func (d *Docker) deploy(name, space string, templateParam interface{}) {
 
 func (d *Docker) executeDockerCompose(name string, tplBuffer bytes.Buffer) (string, error) {
 	tplPath := fmt.Sprintf("/tmp/%s.yaml", name)
-	if err := os.WriteFile(tplPath, tplBuffer.Bytes(), 0644); err != nil {
+	if err := os.WriteFile(tplPath, tplBuffer.Bytes(), 0600); err != nil {
 		return "", err
 	}
 

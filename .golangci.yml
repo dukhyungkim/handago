@@ -7,10 +7,8 @@ linters-settings:
   gocritic:
     enabled-tags:
       - diagnostic
-      - experimental
-      - opinionated
       - performance
-      - style
+#      - style
   govet:
     check-shadowing: true
   nolintlint:
