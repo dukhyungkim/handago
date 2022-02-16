@@ -26,7 +26,7 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
-    needs: [lint]
+    needs: [ lint ]
     steps:
       - uses: actions/checkout@v2
 
@@ -43,35 +43,41 @@ jobs:
       - name: Run build
         run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build
 
+      - name: Tar artifact
+        run: tar -cvf artifact.tar handago
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v2
         with:
           name: build-artifact
-          path: handago
+          path: artifact.tar
           retention-days: 7
 
   deploy:
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [ build ]
     steps:
-    - uses: actions/checkout@v2
+      - uses: actions/checkout@v2
 
-    - name: Download a single artifact
-      uses: actions/download-artifact@v2
-      with:
-        name: build-artifact
+      - name: Download a single artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: build-artifact
 
-    - name: Log in to the Container registry
-      uses: docker/login-action@v1
-      with:
-        registry: ${{ secrets.DOCKER_REPO_HOST }}
-        username: ${{ secrets.DOCKER_REPO_USERNAME }}
-        password: ${{ secrets.DOCKER_REPO_TOKEN }}
+      - name: Untar artifact
+        run: tar -xvf artifact.tar
 
-    - name: Build and push
-      id: docker_build
-      uses: docker/build-push-action@v2
-      with:
-        context: .
-        push: true
-        tags: ${{ secrets.DOCKER_REPO_HOST }}/${{ env.IMAGE_NAME }}:${{ github.run_number }}
+      - name: Log in to the Container registry
+        uses: docker/login-action@v1
+        with:
+          registry: ${{ secrets.DOCKER_REPO_HOST }}
+          username: ${{ secrets.DOCKER_REPO_USERNAME }}
+          password: ${{ secrets.DOCKER_REPO_TOKEN }}
+
+      - name: Build and push
+        id: docker_build
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.DOCKER_REPO_HOST }}/${{ env.IMAGE_NAME }}:${{ github.run_number }}
