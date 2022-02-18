@@ -16,12 +16,12 @@ import (
 	"os/exec"
 )
 
-type Docker struct {
+type Handler struct {
 	etcdClient   *clientv3.Client
 	streamClient *stream.Client
 }
 
-func NewDockerHandler(cfg *config.Etcd, streamClient *stream.Client) (*Docker, error) {
+func NewHandler(cfg *config.Etcd, streamClient *stream.Client) (*Handler, error) {
 	etcdClient, err := clientv3.New(clientv3.Config{
 		Endpoints:   cfg.Endpoints,
 		DialTimeout: common.DefaultTimeout,
@@ -32,29 +32,29 @@ func NewDockerHandler(cfg *config.Etcd, streamClient *stream.Client) (*Docker, e
 		return nil, common.ErrConnEtcd(err)
 	}
 
-	return &Docker{etcdClient: etcdClient, streamClient: streamClient}, nil
+	return &Handler{etcdClient: etcdClient, streamClient: streamClient}, nil
 }
 
-func (d *Docker) Close() {
-	if err := d.etcdClient.Close(); err != nil {
+func (h *Handler) Close() {
+	if err := h.etcdClient.Close(); err != nil {
 		log.Printf("failed to close etcd client cleany; %v\n", err)
 	}
 }
 
-func (d *Docker) HandleAction(request *pbAct.ActionRequest) {
-	templateParam := tm.NewDeployTemplate(request.GetReqDeploy())
+func (h *Handler) HandleSharedAction(host, base string, request *pbAct.ActionRequest) {
+	templateParam := tm.NewSharedDeployTemplate(host, base, request.GetReqDeploy())
 
-	d.deploy(templateParam.Name, request.GetSpace(), templateParam)
+	h.deploy(templateParam.Name, request.GetSpace(), templateParam)
 }
 
-func (d *Docker) HandleCompanyAction(company, host string, request *pbAct.ActionRequest) {
-	templateParam := tm.NewCompanyDeployTemplate(company, host, request.GetReqDeploy())
+func (h *Handler) HandleCompanyAction(company, host, base string, request *pbAct.ActionRequest) {
+	templateParam := tm.NewCompanyDeployTemplate(company, host, base, request.GetReqDeploy())
 
-	d.deploy(templateParam.Name, request.GetSpace(), templateParam)
+	h.deploy(templateParam.Name, request.GetSpace(), templateParam)
 }
 
-func (d *Docker) deploy(name, space string, templateParam interface{}) {
-	deployTemplate, err := d.loadTemplate(name)
+func (h *Handler) deploy(name, space string, templateParam interface{}) {
+	deployTemplate, err := h.loadTemplate(name)
 	if err != nil {
 		log.Println(err)
 		return
@@ -72,16 +72,16 @@ func (d *Docker) deploy(name, space string, templateParam interface{}) {
 		return
 	}
 
-	output, err := d.executeDockerCompose(name, tplBuffer)
+	output, err := h.executeDockerCompose(name, tplBuffer)
 	if err != nil {
 		log.Printf("failed to execute docker-compose; %v\n", err)
 		return
 	}
 
-	d.sendResponse(space, output)
+	h.sendResponse(space, output)
 }
 
-func (d *Docker) executeDockerCompose(name string, tplBuffer bytes.Buffer) (string, error) {
+func (h *Handler) executeDockerCompose(name string, tplBuffer bytes.Buffer) (string, error) {
 	tplPath := fmt.Sprintf("/tmp/%s.yaml", name)
 	if err := os.WriteFile(tplPath, tplBuffer.Bytes(), 0600); err != nil {
 		return "", err
@@ -105,12 +105,12 @@ func (d *Docker) executeDockerCompose(name string, tplBuffer bytes.Buffer) (stri
 	return string(output), err
 }
 
-func (d *Docker) loadTemplate(name string) (string, error) {
+func (h *Handler) loadTemplate(name string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), common.DefaultTimeout)
 	defer cancel()
 
 	deployKey := fmt.Sprintf("/%s", name)
-	deployTemplate, err := d.etcdClient.Get(ctx, deployKey)
+	deployTemplate, err := h.etcdClient.Get(ctx, deployKey)
 	if err != nil {
 		return "", err
 	}
@@ -121,12 +121,12 @@ func (d *Docker) loadTemplate(name string) (string, error) {
 	return string(deployTemplate.Kvs[0].Value), nil
 }
 
-func (d *Docker) sendResponse(space, output string) {
+func (h *Handler) sendResponse(space, output string) {
 	response := &pbAct.ActionResponse{
 		Text:  output,
 		Space: space,
 	}
-	if err := d.streamClient.PublishResponse(response); err != nil {
+	if err := h.streamClient.PublishResponse(response); err != nil {
 		log.Println(err)
 		return
 	}

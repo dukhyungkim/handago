@@ -8,6 +8,7 @@ type Options struct {
 	Company    string `long:"company" description:"use company subscriber"`
 	Shared     bool   `long:"shared" description:"use shared subscriber"`
 	Host       string `long:"host" description:"host url"`
+	Base       string `long:"base" description:"base path"`
 }
 
 func ParseFlags() (*Options, error) {

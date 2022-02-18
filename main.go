@@ -38,7 +38,7 @@ func main() {
 	defer streamClient.Close()
 	log.Println("connect to nats ... success")
 
-	dockerHandler, err := handler.NewDockerHandler(cfg.Etcd, streamClient)
+	dockerHandler, err := handler.NewHandler(cfg.Etcd, streamClient)
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -46,13 +46,13 @@ func main() {
 	log.Println("setup DockerHandler ... success")
 
 	if opts.Shared {
-		if err := streamClient.ClamSharedAction(dockerHandler.HandleAction); err != nil {
+		if err := streamClient.ClamSharedAction(opts.Host, opts.Base, dockerHandler.HandleSharedAction); err != nil {
 			log.Panicln(err)
 		}
 	}
 
 	if opts.Company != "" {
-		if err := streamClient.ClamCompanyAction(opts.Company, opts.Host, dockerHandler.HandleCompanyAction); err != nil {
+		if err := streamClient.ClamCompanyAction(opts.Company, opts.Host, opts.Base, dockerHandler.HandleCompanyAction); err != nil {
 			log.Panicln(err)
 		}
 	}
