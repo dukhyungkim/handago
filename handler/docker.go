@@ -14,6 +14,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"time"
 )
 
 type Handler struct {
@@ -44,41 +45,51 @@ func (h *Handler) Close() {
 func (h *Handler) HandleSharedAction(host, base string, request *pbAct.ActionRequest) {
 	templateParam := tm.NewSharedDeployTemplate(host, base, request.GetReqDeploy())
 
-	h.deploy(templateParam.Name, request.GetSpace(), templateParam)
+	output, err := h.deploy(templateParam.Name, templateParam)
+	if err != nil {
+		h.sendResponse(request.GetSpace(), err.Error())
+		return
+	}
+	h.sendResponse(request.GetSpace(), output)
 }
 
 func (h *Handler) HandleCompanyAction(company, host, base string, request *pbAct.ActionRequest) {
 	templateParam := tm.NewCompanyDeployTemplate(company, host, base, request.GetReqDeploy())
 
-	h.deploy(templateParam.Name, request.GetSpace(), templateParam)
+	output, err := h.deploy(templateParam.Name, templateParam)
+	if err != nil {
+		h.sendResponse(request.GetSpace(), err.Error())
+		return
+	}
+	h.sendResponse(request.GetSpace(), output)
 }
 
-func (h *Handler) deploy(name, space string, templateParam interface{}) {
+func (h *Handler) deploy(name string, templateParam interface{}) (string, error) {
 	deployTemplate, err := h.loadTemplate(name)
 	if err != nil {
 		log.Println(err)
-		return
+		return "", err
 	}
 
 	tpl, err := template.New(name).Parse(deployTemplate)
 	if err != nil {
 		log.Printf("failed to create template; %v\n", err)
-		return
+		return "", err
 	}
 
 	var tplBuffer bytes.Buffer
 	if err = tpl.Execute(&tplBuffer, templateParam); err != nil {
-		log.Println("failed to apply template ", err)
-		return
+		log.Printf("failed to apply template; %v\n", err)
+		return "", err
 	}
 
 	output, err := h.executeDockerCompose(name, tplBuffer)
 	if err != nil {
 		log.Printf("failed to execute docker-compose; %v\n", err)
-		return
+		return "", err
 	}
 
-	h.sendResponse(space, output)
+	return output, nil
 }
 
 func (h *Handler) executeDockerCompose(name string, tplBuffer bytes.Buffer) (string, error) {
@@ -92,6 +103,8 @@ func (h *Handler) executeDockerCompose(name string, tplBuffer bytes.Buffer) (str
 	if err := exec.Command(cmdDockerCompose, "-f", tplPath, "up", "-d").Run(); err != nil {
 		return "", err
 	}
+
+	time.Sleep(5 * time.Second)
 
 	output, err := exec.Command(cmdDockerCompose, "-f", tplPath, "ps").Output()
 	if err != nil {
