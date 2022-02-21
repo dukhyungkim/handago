@@ -47,10 +47,10 @@ func (h *Handler) HandleSharedAction(host, base string, request *pbAct.ActionReq
 
 	output, err := h.deploy(templateParam.Name, templateParam)
 	if err != nil {
-		h.sendResponse(request.GetSpace(), err.Error())
+		h.sendDeployResponse(templateParam.ToActionResponse(request.GetSpace(), err.Error()))
 		return
 	}
-	h.sendResponse(request.GetSpace(), output)
+	h.sendDeployResponse(templateParam.ToActionResponse(request.GetSpace(), output))
 }
 
 func (h *Handler) HandleCompanyAction(company, host, base string, request *pbAct.ActionRequest) {
@@ -58,10 +58,10 @@ func (h *Handler) HandleCompanyAction(company, host, base string, request *pbAct
 
 	output, err := h.deploy(templateParam.Name, templateParam)
 	if err != nil {
-		h.sendResponse(request.GetSpace(), err.Error())
+		h.sendDeployResponse(templateParam.ToActionResponse(request.GetSpace(), err.Error()))
 		return
 	}
-	h.sendResponse(request.GetSpace(), output)
+	h.sendDeployResponse(templateParam.ToActionResponse(request.GetSpace(), output))
 }
 
 func (h *Handler) deploy(name string, templateParam interface{}) (string, error) {
@@ -134,11 +134,7 @@ func (h *Handler) loadTemplate(name string) (string, error) {
 	return string(deployTemplate.Kvs[0].Value), nil
 }
 
-func (h *Handler) sendResponse(space, output string) {
-	response := &pbAct.ActionResponse{
-		Text:  output,
-		Space: space,
-	}
+func (h *Handler) sendDeployResponse(response *pbAct.ActionResponse) {
 	if err := h.streamClient.PublishResponse(response); err != nil {
 		log.Println(err)
 		return
