@@ -26,6 +26,7 @@ func (t *SharedDeployTemplate) ToActionResponse(space, output string) *pbAct.Act
 		Space: space,
 		Response_OneOf: &pbAct.ActionResponse_RespDeploy{
 			RespDeploy: &pbAct.ActionResponse_DeployResponse{
+				Host:        t.Host,
 				Text:        output,
 				Company:     "Shared",
 				ResourceUrl: t.ResourceURL,
@@ -52,6 +53,7 @@ func (t *CompanyDeployTemplate) ToActionResponse(space, output string) *pbAct.Ac
 		Space: space,
 		Response_OneOf: &pbAct.ActionResponse_RespDeploy{
 			RespDeploy: &pbAct.ActionResponse_DeployResponse{
+				Host:        t.Host,
 				Text:        output,
 				Company:     t.Company,
 				ResourceUrl: t.ResourceURL,

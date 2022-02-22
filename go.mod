@@ -14,7 +14,7 @@ require (
 	github.com/BurntSushi/toml v0.3.1 // indirect
 	github.com/coreos/go-semver v0.3.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
-	github.com/dukhyungkim/libharago v0.0.0-20220221122744-aef9c2eac9bc // indirect
+	github.com/dukhyungkim/libharago v0.0.0-20220222141021-d0388c62549b // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/joho/godotenv v1.3.0 // indirect

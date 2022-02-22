@@ -33,6 +33,8 @@ github.com/dukhyungkim/libharago v0.0.0-20220203145533-414bd564aa32 h1:ozy0FwPZf
 github.com/dukhyungkim/libharago v0.0.0-20220203145533-414bd564aa32/go.mod h1:lbR50PKYohx6qo/lfK22iFlwPgZsSJ/bgX9SxLOuh5I=
 github.com/dukhyungkim/libharago v0.0.0-20220221122744-aef9c2eac9bc h1:1HgNfFi+7xRPvY2v1HiOW/uAiheJMEntkkszB0kIJ6I=
 github.com/dukhyungkim/libharago v0.0.0-20220221122744-aef9c2eac9bc/go.mod h1:lbR50PKYohx6qo/lfK22iFlwPgZsSJ/bgX9SxLOuh5I=
+github.com/dukhyungkim/libharago v0.0.0-20220222141021-d0388c62549b h1:5Bf5Nn5QdnzPBS6EMz7p2RriQnGS6BS2sXvoU259YnI=
+github.com/dukhyungkim/libharago v0.0.0-20220222141021-d0388c62549b/go.mod h1:lbR50PKYohx6qo/lfK22iFlwPgZsSJ/bgX9SxLOuh5I=
 github.com/dustin/go-humanize v1.0.0/go.mod h1:HtrtbFcZ19U5GC7JDqmcUSB87Iq5E25KnS6fMYU6eOk=
 github.com/envoyproxy/go-control-plane v0.9.0/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymFceY/DCBVvsKhRF0iEA4=
 github.com/envoyproxy/go-control-plane v0.9.1-0.20191026205805-5f8ba28d4473/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymFceY/DCBVvsKhRF0iEA4=
