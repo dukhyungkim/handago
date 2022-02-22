@@ -45,7 +45,7 @@ func (h *Handler) Close() {
 func (h *Handler) HandleSharedAction(host, base string, request *pbAct.ActionRequest) {
 	templateParam := tm.NewSharedDeployTemplate(host, base, request.GetReqDeploy())
 
-	output, err := h.deploy(templateParam.Name, templateParam)
+	output, err := h.deploy("shared", templateParam.Name, templateParam)
 	if err != nil {
 		h.sendDeployResponse(templateParam.ToActionResponse(request.GetSpace(), err.Error()))
 		return
@@ -56,7 +56,7 @@ func (h *Handler) HandleSharedAction(host, base string, request *pbAct.ActionReq
 func (h *Handler) HandleCompanyAction(company, host, base string, request *pbAct.ActionRequest) {
 	templateParam := tm.NewCompanyDeployTemplate(company, host, base, request.GetReqDeploy())
 
-	output, err := h.deploy(templateParam.Name, templateParam)
+	output, err := h.deploy(company, templateParam.Name, templateParam)
 	if err != nil {
 		h.sendDeployResponse(templateParam.ToActionResponse(request.GetSpace(), err.Error()))
 		return
@@ -64,7 +64,7 @@ func (h *Handler) HandleCompanyAction(company, host, base string, request *pbAct
 	h.sendDeployResponse(templateParam.ToActionResponse(request.GetSpace(), output))
 }
 
-func (h *Handler) deploy(name string, templateParam interface{}) (string, error) {
+func (h *Handler) deploy(company, name string, templateParam interface{}) (string, error) {
 	deployTemplate, err := h.loadTemplate(name)
 	if err != nil {
 		log.Println(err)
@@ -83,7 +83,7 @@ func (h *Handler) deploy(name string, templateParam interface{}) (string, error)
 		return "", err
 	}
 
-	output, err := h.executeDockerCompose(name, tplBuffer)
+	output, err := h.executeDockerCompose(company, name, tplBuffer)
 	if err != nil {
 		log.Printf("failed to execute docker-compose; %v\n", err)
 		return "", err
@@ -92,8 +92,8 @@ func (h *Handler) deploy(name string, templateParam interface{}) (string, error)
 	return output, nil
 }
 
-func (h *Handler) executeDockerCompose(name string, tplBuffer bytes.Buffer) (string, error) {
-	tplPath := fmt.Sprintf("/tmp/%s.yaml", name)
+func (h *Handler) executeDockerCompose(company, name string, tplBuffer bytes.Buffer) (string, error) {
+	tplPath := fmt.Sprintf("/tmp/%s_%s.yaml", company, name)
 	if err := os.WriteFile(tplPath, tplBuffer.Bytes(), 0600); err != nil {
 		return "", err
 	}
