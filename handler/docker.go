@@ -115,6 +115,7 @@ func (h *Handler) executeDockerCompose(company, name string, tplBuffer bytes.Buf
 	if err != nil {
 		return "", err
 	}
+
 	return string(output), err
 }
 

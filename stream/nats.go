@@ -72,7 +72,6 @@ func (s *Client) ClamCompanyAction(company, host, base string, handler CompanyAc
 	}); err != nil {
 		return err
 	}
-
 	return nil
 }
 
