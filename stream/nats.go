@@ -2,13 +2,14 @@ package stream
 
 import (
 	"fmt"
-	pbAct "github.com/dukhyungkim/libharago/gen/go/proto/action"
-	"github.com/nats-io/nats.go"
-	"google.golang.org/protobuf/proto"
 	"handago/config"
 	"log"
 	"strings"
 	"time"
+
+	pbAct "github.com/dukhyungkim/libharago/gen/go/proto/action"
+	"github.com/nats-io/nats.go"
+	"google.golang.org/protobuf/proto"
 )
 
 type Client struct {
@@ -46,7 +47,8 @@ func (s *Client) PublishResponse(response *pbAct.ActionResponse) error {
 type CompanyActionHandler func(company, host, base string, request *pbAct.ActionRequest)
 
 func (s *Client) ClamCompanyAction(company, host, base string, handler CompanyActionHandler) error {
-	if _, err := s.nc.Subscribe("harago.company.action", func(msg *nats.Msg) {
+	const commonCompanySubject = "harago.company.action"
+	if _, err := s.nc.Subscribe(commonCompanySubject, func(msg *nats.Msg) {
 		var request pbAct.ActionRequest
 		if err := proto.Unmarshal(msg.Data, &request); err != nil {
 			log.Println(err)
@@ -59,8 +61,8 @@ func (s *Client) ClamCompanyAction(company, host, base string, handler CompanyAc
 		return err
 	}
 
-	specialSubject := fmt.Sprintf("harago.%s.action", company)
-	if _, err := s.nc.QueueSubscribe(specialSubject, "handago", func(msg *nats.Msg) {
+	specificCompanySubject := fmt.Sprintf("harago.%s.action", company)
+	if _, err := s.nc.QueueSubscribe(specificCompanySubject, "handago", func(msg *nats.Msg) {
 		var request pbAct.ActionRequest
 		if err := proto.Unmarshal(msg.Data, &request); err != nil {
 			log.Println(err)

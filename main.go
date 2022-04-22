@@ -19,21 +19,21 @@ func main() {
 
 	opts, err := config.ParseFlags()
 	if err != nil {
-		log.Fatalln(err)
+		log.Panicln(err)
 	}
 
 	if !opts.Shared && opts.Company == "" {
-		log.Fatalln("--shared or --company must be set")
+		log.Panicln("--shared or --company must be set")
 	}
 
 	cfg, err := config.NewConfig(opts)
 	if err != nil {
-		log.Fatalln(err)
+		log.Panicln(err)
 	}
 
 	streamClient, err := stream.NewStreamClient(cfg.Nats)
 	if err != nil {
-		log.Fatalln(err)
+		log.Panicln(err)
 	}
 	defer streamClient.Close()
 	log.Println("connect to nats ... success")
@@ -46,13 +46,15 @@ func main() {
 	log.Println("setup DockerHandler ... success")
 
 	if opts.Shared {
-		if err := streamClient.ClamSharedAction(opts.Host, opts.Base, dockerHandler.HandleSharedAction); err != nil {
+		err = streamClient.ClamSharedAction(opts.Host, opts.Base, dockerHandler.HandleSharedAction)
+		if err != nil {
 			log.Panicln(err)
 		}
 	}
 
 	if opts.Company != "" {
-		if err := streamClient.ClamCompanyAction(opts.Company, opts.Host, opts.Base, dockerHandler.HandleCompanyAction); err != nil {
+		err = streamClient.ClamCompanyAction(opts.Company, opts.Host, opts.Base, dockerHandler.HandleCompanyAction)
+		if err != nil {
 			log.Panicln(err)
 		}
 	}

@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	pbAct "github.com/dukhyungkim/libharago/gen/go/proto/action"
-	clientv3 "go.etcd.io/etcd/client/v3"
 	"handago/common"
 	"handago/config"
 	tm "handago/handler/model"
@@ -15,6 +13,9 @@ import (
 	"os"
 	"os/exec"
 	"time"
+
+	pbAct "github.com/dukhyungkim/libharago/gen/go/proto/action"
+	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
 type Handler struct {
@@ -43,20 +44,36 @@ func (h *Handler) Close() {
 }
 
 func (h *Handler) HandleSharedAction(host, base string, request *pbAct.ActionRequest) {
-	templateParam := tm.NewSharedDeployTemplate(host, base, request.GetReqDeploy())
+	company := "shared"
+	actionType := request.GetType()
+	switch actionType {
+	case pbAct.ActionType_UP, pbAct.ActionType_DOWN:
+		templateParam := tm.NewDeployTemplateParam(host, base, request.GetReqDeploy())
 
-	output, err := h.deploy("shared", templateParam.Name, templateParam)
-	if err != nil {
-		h.sendDeployResponse(templateParam.ToActionResponse(request.GetSpace(), err.Error()))
-		return
+		templateBuffer, err := h.deploy(templateParam.Name, templateParam)
+		if err != nil {
+			h.sendDeployResponse(templateParam.ToActionResponse(request.GetSpace(), err.Error(), actionType))
+			return
+		}
+
+		output, err := h.executeDockerCompose(company, name, templateBuffer, actionType)
+		if err != nil {
+			h.sendDeployResponse(templateParam.ToActionResponse(request.GetSpace(), err.Error()))
+			return
+		}
+
+		h.sendDeployResponse(templateParam.ToActionResponse(request.GetSpace(), output))
 	}
-	h.sendDeployResponse(templateParam.ToActionResponse(request.GetSpace(), output))
+	// prepareTemplate()
+	// saveComposeFile()
+	// run
 }
 
 func (h *Handler) HandleCompanyAction(company, host, base string, request *pbAct.ActionRequest) {
-	templateParam := tm.NewCompanyDeployTemplate(company, host, base, request.GetReqDeploy())
+	templateParam := tm.NewDeployTemplateParam(host, base, request.GetReqDeploy())
+	templateParam.SetCompany(company)
 
-	output, err := h.deploy(company, templateParam.Name, templateParam)
+	output, err := h.deploy(templateParam.Name, templateParam)
 	if err != nil {
 		h.sendDeployResponse(templateParam.ToActionResponse(request.GetSpace(), err.Error()))
 		return
@@ -64,43 +81,42 @@ func (h *Handler) HandleCompanyAction(company, host, base string, request *pbAct
 	h.sendDeployResponse(templateParam.ToActionResponse(request.GetSpace(), output))
 }
 
-func (h *Handler) deploy(company, name string, templateParam interface{}) (string, error) {
+func (h *Handler) deploy(name string, templateParam interface{}) (*bytes.Buffer, error) {
 	deployTemplate, err := h.loadTemplate(name)
 	if err != nil {
 		log.Println(err)
-		return "", err
+		return nil, err
 	}
 
 	tpl, err := template.New(name).Parse(deployTemplate)
 	if err != nil {
 		log.Printf("failed to create template; %v\n", err)
-		return "", err
+		return nil, err
 	}
 
 	var tplBuffer bytes.Buffer
-	if err = tpl.Execute(&tplBuffer, templateParam); err != nil {
-		log.Printf("failed to apply template; %v\n", err)
-		return "", err
-	}
-
-	output, err := h.executeDockerCompose(company, name, tplBuffer)
+	err = tpl.Execute(&tplBuffer, templateParam)
 	if err != nil {
-		log.Printf("failed to execute docker-compose; %v\n", err)
-		return "", err
+		log.Printf("failed to apply template; %v\n", err)
+		return nil, err
 	}
 
-	return output, nil
+	return &tplBuffer, nil
 }
 
-func (h *Handler) executeDockerCompose(company, name string, tplBuffer bytes.Buffer) (string, error) {
+func (h *Handler) executeDockerCompose(company, name string, tplBuffer bytes.Buffer, actionType pbAct.ActionType) (string, error) {
 	tplPath := fmt.Sprintf("/tmp/%s_%s.yaml", company, name)
-	if err := os.WriteFile(tplPath, tplBuffer.Bytes(), 0600); err != nil {
+	err := os.WriteFile(tplPath, tplBuffer.Bytes(), 0600)
+	if err != nil {
+		log.Println(err)
 		return "", err
 	}
 
 	const cmdDockerCompose = "docker-compose"
 
-	if err := exec.Command(cmdDockerCompose, "-f", tplPath, "up", "-d").Run(); err != nil {
+	err = exec.Command(cmdDockerCompose, "-f", tplPath, "up", "-d").Run()
+	if err != nil {
+		log.Println(err)
 		return "", err
 	}
 
@@ -108,11 +124,13 @@ func (h *Handler) executeDockerCompose(company, name string, tplBuffer bytes.Buf
 
 	output, err := exec.Command(cmdDockerCompose, "-f", tplPath, "ps").Output()
 	if err != nil {
+		log.Println(err)
 		return "", err
 	}
 
 	err = os.Remove(tplPath)
 	if err != nil {
+		log.Println(err)
 		return "", err
 	}
 

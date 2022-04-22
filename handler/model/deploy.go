@@ -4,15 +4,17 @@ import (
 	pbAct "github.com/dukhyungkim/libharago/gen/go/proto/action"
 )
 
-type SharedDeployTemplate struct {
+type DeployTemplateParam struct {
+	Company     string
 	Name        string
 	ResourceURL string
 	Host        string
 	Base        string
 }
 
-func NewSharedDeployTemplate(host, base string, request *pbAct.ActionRequest_DeployRequest) *SharedDeployTemplate {
-	return &SharedDeployTemplate{
+func NewDeployTemplateParam(host, base string, request *pbAct.ActionRequest_DeployRequest) *DeployTemplateParam {
+	return &DeployTemplateParam{
+		Company:     "Shared",
 		Name:        request.GetName(),
 		ResourceURL: request.GetResourceUrl(),
 		Host:        host,
@@ -20,36 +22,13 @@ func NewSharedDeployTemplate(host, base string, request *pbAct.ActionRequest_Dep
 	}
 }
 
-func (t *SharedDeployTemplate) ToActionResponse(space, output string) *pbAct.ActionResponse {
+func (t *DeployTemplateParam) SetCompany(company string) {
+	t.Company = company
+}
+
+func (t *DeployTemplateParam) ToActionResponse(space, output string, actionType pbAct.ActionType) *pbAct.ActionResponse {
 	return &pbAct.ActionResponse{
-		Type:  pbAct.ActionType_DEPLOY,
-		Space: space,
-		Response_OneOf: &pbAct.ActionResponse_RespDeploy{
-			RespDeploy: &pbAct.ActionResponse_DeployResponse{
-				Host:        t.Host,
-				Text:        output,
-				Company:     "Shared",
-				ResourceUrl: t.ResourceURL,
-			},
-		},
-	}
-}
-
-type CompanyDeployTemplate struct {
-	Company string
-	*SharedDeployTemplate
-}
-
-func NewCompanyDeployTemplate(company, host, base string, request *pbAct.ActionRequest_DeployRequest) *CompanyDeployTemplate {
-	return &CompanyDeployTemplate{
-		Company:              company,
-		SharedDeployTemplate: NewSharedDeployTemplate(host, base, request),
-	}
-}
-
-func (t *CompanyDeployTemplate) ToActionResponse(space, output string) *pbAct.ActionResponse {
-	return &pbAct.ActionResponse{
-		Type:  pbAct.ActionType_DEPLOY,
+		Type:  actionType,
 		Space: space,
 		Response_OneOf: &pbAct.ActionResponse_RespDeploy{
 			RespDeploy: &pbAct.ActionResponse_DeployResponse{
