@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"handago/common"
 	"handago/config"
-	tm "handago/handler/model"
+	"handago/handler/model"
 	"handago/stream"
 	"html/template"
 	"log"
@@ -48,32 +48,29 @@ func (h *Handler) HandleSharedAction(host, base string, request *pbAct.ActionReq
 	actionType := request.GetType()
 	switch actionType {
 	case pbAct.ActionType_UP, pbAct.ActionType_DOWN:
-		templateParam := tm.NewDeployTemplateParam(host, base, request.GetReqDeploy())
+		templateParam := model.NewDeployTemplateParam(host, base, request.GetReqDeploy())
 
-		templateBuffer, err := h.deploy(templateParam.Name, templateParam)
+		templateBuffer, err := h.prepareTemplate(templateParam)
 		if err != nil {
 			h.sendDeployResponse(templateParam.ToActionResponse(request.GetSpace(), err.Error(), actionType))
 			return
 		}
 
-		output, err := h.executeDockerCompose(company, name, templateBuffer, actionType)
+		output, err := h.executeDockerCompose(templateParam, templateBuffer, actionType)
 		if err != nil {
-			h.sendDeployResponse(templateParam.ToActionResponse(request.GetSpace(), err.Error()))
+			h.sendDeployResponse(templateParam.ToActionResponse(request.GetSpace(), err.Error(), actionType))
 			return
 		}
 
-		h.sendDeployResponse(templateParam.ToActionResponse(request.GetSpace(), output))
+		h.sendDeployResponse(templateParam.ToActionResponse(request.GetSpace(), output, actionType))
 	}
-	// prepareTemplate()
-	// saveComposeFile()
-	// run
 }
 
 func (h *Handler) HandleCompanyAction(company, host, base string, request *pbAct.ActionRequest) {
-	templateParam := tm.NewDeployTemplateParam(host, base, request.GetReqDeploy())
+	templateParam := model.NewDeployTemplateParam(host, base, request.GetReqDeploy())
 	templateParam.SetCompany(company)
 
-	output, err := h.deploy(templateParam.Name, templateParam)
+	output, err := h.prepareTemplate(templateParam)
 	if err != nil {
 		h.sendDeployResponse(templateParam.ToActionResponse(request.GetSpace(), err.Error()))
 		return
@@ -81,14 +78,30 @@ func (h *Handler) HandleCompanyAction(company, host, base string, request *pbAct
 	h.sendDeployResponse(templateParam.ToActionResponse(request.GetSpace(), output))
 }
 
-func (h *Handler) deploy(name string, templateParam interface{}) (*bytes.Buffer, error) {
-	deployTemplate, err := h.loadTemplate(name)
+func (h *Handler) loadTemplate(name string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), common.DefaultTimeout)
+	defer cancel()
+
+	deployKey := fmt.Sprintf("/%s", name)
+	deployTemplate, err := h.etcdClient.Get(ctx, deployKey)
+	if err != nil {
+		return "", err
+	}
+
+	if len(deployTemplate.Kvs) == 0 {
+		return "", fmt.Errorf("failed to find value from key: %s", deployKey)
+	}
+	return string(deployTemplate.Kvs[0].Value), nil
+}
+
+func (h *Handler) prepareTemplate(templateParam *model.DeployTemplateParam) (*bytes.Buffer, error) {
+	deployTemplate, err := h.loadTemplate(templateParam.Name)
 	if err != nil {
 		log.Println(err)
 		return nil, err
 	}
 
-	tpl, err := template.New(name).Parse(deployTemplate)
+	tpl, err := template.New(templateParam.Name).Parse(deployTemplate)
 	if err != nil {
 		log.Printf("failed to create template; %v\n", err)
 		return nil, err
@@ -104,9 +117,10 @@ func (h *Handler) deploy(name string, templateParam interface{}) (*bytes.Buffer,
 	return &tplBuffer, nil
 }
 
-func (h *Handler) executeDockerCompose(company, name string, tplBuffer bytes.Buffer, actionType pbAct.ActionType) (string, error) {
-	tplPath := fmt.Sprintf("/tmp/%s_%s.yaml", company, name)
-	err := os.WriteFile(tplPath, tplBuffer.Bytes(), 0600)
+func (h *Handler) executeDockerCompose(templateParam *model.DeployTemplateParam, tplBuffer *bytes.Buffer, actionType pbAct.ActionType) (string, error) {
+	var err error
+	tplPath := fmt.Sprintf("/tmp/%s_%s.yaml", templateParam.Company, templateParam.Name)
+	err = os.WriteFile(tplPath, tplBuffer.Bytes(), 0600)
 	if err != nil {
 		log.Println(err)
 		return "", err
@@ -114,7 +128,17 @@ func (h *Handler) executeDockerCompose(company, name string, tplBuffer bytes.Buf
 
 	const cmdDockerCompose = "docker-compose"
 
-	err = exec.Command(cmdDockerCompose, "-f", tplPath, "up", "-d").Run()
+	switch actionType {
+	case pbAct.ActionType_UP:
+		err = exec.Command(cmdDockerCompose, "-f", tplPath, "up", "-d").Run()
+
+	case pbAct.ActionType_DOWN:
+		err = exec.Command(cmdDockerCompose, "-f", tplPath, "down").Run()
+
+	default:
+		err = fmt.Errorf("unknown action type: %s", actionType)
+
+	}
 	if err != nil {
 		log.Println(err)
 		return "", err
@@ -135,22 +159,6 @@ func (h *Handler) executeDockerCompose(company, name string, tplBuffer bytes.Buf
 	}
 
 	return string(output), err
-}
-
-func (h *Handler) loadTemplate(name string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), common.DefaultTimeout)
-	defer cancel()
-
-	deployKey := fmt.Sprintf("/%s", name)
-	deployTemplate, err := h.etcdClient.Get(ctx, deployKey)
-	if err != nil {
-		return "", err
-	}
-
-	if len(deployTemplate.Kvs) == 0 {
-		return "", fmt.Errorf("failed to find value from key: %s", deployKey)
-	}
-	return string(deployTemplate.Kvs[0].Value), nil
 }
 
 func (h *Handler) sendDeployResponse(response *pbAct.ActionResponse) {
