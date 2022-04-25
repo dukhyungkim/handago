@@ -32,21 +32,19 @@ func (s *Client) Close() {
 }
 
 func (s *Client) PublishResponse(response *pbAct.ActionResponse) error {
-	b, err := proto.Marshal(response)
-	if err != nil {
-		return err
-	}
+	b, _ := proto.Marshal(response)
 
 	const subject = "handago.response"
-	if err := s.nc.Publish(subject, b); err != nil {
+	err := s.nc.Publish(subject, b)
+	if err != nil {
 		return err
 	}
 	return nil
 }
 
-type CompanyActionHandler func(company, host, base string, request *pbAct.ActionRequest)
+type UpDownActionHandler func(request *pbAct.ActionRequest)
 
-func (s *Client) ClamCompanyAction(company, host, base string, handler CompanyActionHandler) error {
+func (s *Client) ClamCompanyAction(company string, handler UpDownActionHandler) error {
 	const commonCompanySubject = "harago.company.action"
 	if _, err := s.nc.Subscribe(commonCompanySubject, func(msg *nats.Msg) {
 		var request pbAct.ActionRequest
@@ -56,7 +54,7 @@ func (s *Client) ClamCompanyAction(company, host, base string, handler CompanyAc
 		}
 
 		log.Println("Request:", request.String())
-		handler(company, host, base, &request)
+		handler(&request)
 	}); err != nil {
 		return err
 	}
@@ -70,17 +68,16 @@ func (s *Client) ClamCompanyAction(company, host, base string, handler CompanyAc
 		}
 
 		log.Println("Request:", request.String())
-		handler(company, host, base, &request)
+		handler(&request)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-type SharedActionHandler func(host, base string, request *pbAct.ActionRequest)
-
-func (s *Client) ClamSharedAction(host, base string, handler SharedActionHandler) error {
-	if _, err := s.nc.Subscribe("harago.shared.action", func(msg *nats.Msg) {
+func (s *Client) ClamSharedAction(handler UpDownActionHandler) error {
+	const sharedActionSubject = "harago.shared.action"
+	if _, err := s.nc.Subscribe(sharedActionSubject, func(msg *nats.Msg) {
 		var request pbAct.ActionRequest
 		if err := proto.Unmarshal(msg.Data, &request); err != nil {
 			log.Println(err)
@@ -88,7 +85,7 @@ func (s *Client) ClamSharedAction(host, base string, handler SharedActionHandler
 		}
 
 		log.Println("Request:", request.String())
-		handler(host, base, &request)
+		handler(&request)
 	}); err != nil {
 		return err
 	}

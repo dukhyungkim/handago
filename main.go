@@ -23,7 +23,13 @@ func main() {
 	}
 
 	if !opts.Shared && opts.Company == "" {
-		log.Panicln("--shared or --company must be set")
+		log.Println("--shared or --company must be set")
+		return
+	}
+
+	if opts.Company != "" && opts.Adapter == "" {
+		log.Println("--adapter must be set")
+		return
 	}
 
 	cfg, err := config.NewConfig(opts)
@@ -38,7 +44,7 @@ func main() {
 	defer streamClient.Close()
 	log.Println("connect to nats ... success")
 
-	dockerHandler, err := handler.NewHandler(cfg.Etcd, streamClient)
+	dockerHandler, err := handler.New(opts, cfg.Etcd, streamClient)
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -46,14 +52,14 @@ func main() {
 	log.Println("setup DockerHandler ... success")
 
 	if opts.Shared {
-		err = streamClient.ClamSharedAction(opts.Host, opts.Base, dockerHandler.HandleSharedAction)
+		err = streamClient.ClamSharedAction(dockerHandler.HandleUpDownAction)
 		if err != nil {
 			log.Panicln(err)
 		}
 	}
 
 	if opts.Company != "" {
-		err = streamClient.ClamCompanyAction(opts.Company, opts.Host, opts.Base, dockerHandler.HandleCompanyAction)
+		err = streamClient.ClamCompanyAction(opts.Company, dockerHandler.HandleUpDownAction)
 		if err != nil {
 			log.Panicln(err)
 		}

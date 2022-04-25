@@ -1,6 +1,8 @@
 package model
 
 import (
+	"strings"
+
 	pbAct "github.com/dukhyungkim/libharago/gen/go/proto/action"
 )
 
@@ -39,4 +41,11 @@ func (t *DeployTemplateParam) ToActionResponse(space, output string, actionType 
 			},
 		},
 	}
+}
+
+func (t *DeployTemplateParam) IsMatchAdapter(adapter string) bool {
+	if strings.Contains(t.Name, "adapter") {
+		return t.Name == adapter
+	}
+	return true
 }

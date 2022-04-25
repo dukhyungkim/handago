@@ -7,6 +7,7 @@ type Options struct {
 	Etcd       bool   `long:"etcd" description:"read config from etcd"`
 	Company    string `long:"company" description:"use company subscriber"`
 	Shared     bool   `long:"shared" description:"use shared subscriber"`
+	Adapter    string `long:"adapter" description:"choose adapter type"`
 	Host       string `long:"host" description:"host url"`
 	Base       string `long:"base" description:"base path"`
 }

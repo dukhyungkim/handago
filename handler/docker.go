@@ -19,11 +19,15 @@ import (
 )
 
 type Handler struct {
+	company      string
+	host         string
+	base         string
+	adapter      string
 	etcdClient   *clientv3.Client
 	streamClient *stream.Client
 }
 
-func NewHandler(cfg *config.Etcd, streamClient *stream.Client) (*Handler, error) {
+func New(opts *config.Options, cfg *config.Etcd, streamClient *stream.Client) (*Handler, error) {
 	etcdClient, err := clientv3.New(clientv3.Config{
 		Endpoints:   cfg.Endpoints,
 		DialTimeout: common.DefaultTimeout,
@@ -34,7 +38,14 @@ func NewHandler(cfg *config.Etcd, streamClient *stream.Client) (*Handler, error)
 		return nil, common.ErrConnEtcd(err)
 	}
 
-	return &Handler{etcdClient: etcdClient, streamClient: streamClient}, nil
+	return &Handler{
+		company:      opts.Company,
+		host:         opts.Host,
+		base:         opts.Base,
+		adapter:      opts.Adapter,
+		etcdClient:   etcdClient,
+		streamClient: streamClient,
+	}, nil
 }
 
 func (h *Handler) Close() {
@@ -43,12 +54,16 @@ func (h *Handler) Close() {
 	}
 }
 
-func (h *Handler) HandleSharedAction(host, base string, request *pbAct.ActionRequest) {
-	company := "shared"
-	actionType := request.GetType()
-	switch actionType {
+func (h *Handler) HandleUpDownAction(request *pbAct.ActionRequest) {
+	switch actionType := request.GetType(); actionType {
 	case pbAct.ActionType_UP, pbAct.ActionType_DOWN:
-		templateParam := model.NewDeployTemplateParam(host, base, request.GetReqDeploy())
+		templateParam := model.NewDeployTemplateParam(h.host, h.base, request.GetReqDeploy())
+		templateParam.SetCompany(h.company)
+
+		if !templateParam.IsMatchAdapter(h.adapter) {
+			log.Println("adapter is unmatched")
+			return
+		}
 
 		templateBuffer, err := h.prepareTemplate(templateParam)
 		if err != nil {
@@ -64,18 +79,6 @@ func (h *Handler) HandleSharedAction(host, base string, request *pbAct.ActionReq
 
 		h.sendDeployResponse(templateParam.ToActionResponse(request.GetSpace(), output, actionType))
 	}
-}
-
-func (h *Handler) HandleCompanyAction(company, host, base string, request *pbAct.ActionRequest) {
-	templateParam := model.NewDeployTemplateParam(host, base, request.GetReqDeploy())
-	templateParam.SetCompany(company)
-
-	output, err := h.prepareTemplate(templateParam)
-	if err != nil {
-		h.sendDeployResponse(templateParam.ToActionResponse(request.GetSpace(), err.Error()))
-		return
-	}
-	h.sendDeployResponse(templateParam.ToActionResponse(request.GetSpace(), output))
 }
 
 func (h *Handler) loadTemplate(name string) (string, error) {
@@ -137,7 +140,6 @@ func (h *Handler) executeDockerCompose(templateParam *model.DeployTemplateParam,
 
 	default:
 		err = fmt.Errorf("unknown action type: %s", actionType)
-
 	}
 	if err != nil {
 		log.Println(err)

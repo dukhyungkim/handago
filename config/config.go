@@ -3,12 +3,13 @@ package config
 import (
 	"context"
 	"fmt"
-	"github.com/ilyakaznacheev/cleanenv"
-	"go.etcd.io/etcd/client/v3"
-	"gopkg.in/yaml.v3"
 	"handago/common"
 	"log"
 	"time"
+
+	"github.com/ilyakaznacheev/cleanenv"
+	"go.etcd.io/etcd/client/v3"
+	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
