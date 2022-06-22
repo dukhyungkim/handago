@@ -85,7 +85,7 @@ func (h *Handler) loadTemplate(name string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), common.DefaultTimeout)
 	defer cancel()
 
-	deployKey := fmt.Sprintf("/%s", name)
+	deployKey := fmt.Sprintf("/templates/%s", name)
 	deployTemplate, err := h.etcdClient.Get(ctx, deployKey)
 	if err != nil {
 		return "", err
@@ -131,27 +131,30 @@ func (h *Handler) executeDockerCompose(templateParam *model.DeployTemplateParam,
 
 	const cmdDockerCompose = "docker-compose"
 
+	var output []byte
 	switch actionType {
 	case pbAct.ActionType_UP:
-		err = exec.Command(cmdDockerCompose, "-f", tplPath, "up", "-d").Run()
+		output, err = exec.Command(cmdDockerCompose, "-f", tplPath, "up", "-d").CombinedOutput()
 
 	case pbAct.ActionType_DOWN:
-		err = exec.Command(cmdDockerCompose, "-f", tplPath, "down").Run()
+		output, err = exec.Command(cmdDockerCompose, "-f", tplPath, "down").CombinedOutput()
 
 	default:
-		err = fmt.Errorf("unknown action type: %s", actionType)
+		return "", fmt.Errorf("unknown action type: %s", actionType)
 	}
 	if err != nil {
-		log.Println(err)
-		return "", err
+		errWithOutput := fmt.Errorf("%s\n\n%v", string(output), err)
+		log.Println(errWithOutput)
+		return "", errWithOutput
 	}
 
 	time.Sleep(5 * time.Second)
 
-	output, err := exec.Command(cmdDockerCompose, "-f", tplPath, "ps").Output()
+	output, err = exec.Command(cmdDockerCompose, "-f", tplPath, "ps").CombinedOutput()
 	if err != nil {
-		log.Println(err)
-		return "", err
+		errWithOutput := fmt.Errorf("%s\n\n%v", string(output), err)
+		log.Println(errWithOutput)
+		return "", errWithOutput
 	}
 
 	err = os.Remove(tplPath)

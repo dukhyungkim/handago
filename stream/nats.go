@@ -12,6 +12,15 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+const (
+	responseSubject = "handago.response"
+
+	SharedSubject          = "harago.shared.action"
+	CompanySubject         = "harago.company.action"
+	InternalSubject        = "harago.internal.action"
+	SpecificCompanySubject = "harago.%s.action"
+)
+
 type Client struct {
 	nc      *nats.Conn
 	timeout time.Duration
@@ -34,8 +43,7 @@ func (s *Client) Close() {
 func (s *Client) PublishResponse(response *pbAct.ActionResponse) error {
 	b, _ := proto.Marshal(response)
 
-	const subject = "handago.response"
-	err := s.nc.Publish(subject, b)
+	err := s.nc.Publish(responseSubject, b)
 	if err != nil {
 		return err
 	}
@@ -45,39 +53,33 @@ func (s *Client) PublishResponse(response *pbAct.ActionResponse) error {
 type UpDownActionHandler func(request *pbAct.ActionRequest)
 
 func (s *Client) ClamCompanyAction(company string, handler UpDownActionHandler) error {
-	const commonCompanySubject = "harago.company.action"
-	if _, err := s.nc.Subscribe(commonCompanySubject, func(msg *nats.Msg) {
-		var request pbAct.ActionRequest
-		if err := proto.Unmarshal(msg.Data, &request); err != nil {
-			log.Println(err)
-			return
-		}
-
-		log.Println("Request:", request.String())
-		handler(&request)
-	}); err != nil {
+	if _, err := s.nc.Subscribe(CompanySubject, runAction(handler)); err != nil {
 		return err
 	}
 
-	specificCompanySubject := fmt.Sprintf("harago.%s.action", company)
-	if _, err := s.nc.QueueSubscribe(specificCompanySubject, "handago", func(msg *nats.Msg) {
-		var request pbAct.ActionRequest
-		if err := proto.Unmarshal(msg.Data, &request); err != nil {
-			log.Println(err)
-			return
-		}
-
-		log.Println("Request:", request.String())
-		handler(&request)
-	}); err != nil {
+	specificCompanySubject := fmt.Sprintf(SpecificCompanySubject, company)
+	if _, err := s.nc.QueueSubscribe(specificCompanySubject, "handago", runAction(handler)); err != nil {
 		return err
 	}
 	return nil
 }
 
 func (s *Client) ClamSharedAction(handler UpDownActionHandler) error {
-	const sharedActionSubject = "harago.shared.action"
-	if _, err := s.nc.Subscribe(sharedActionSubject, func(msg *nats.Msg) {
+	if _, err := s.nc.Subscribe(SharedSubject, runAction(handler)); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *Client) ClamInternalAction(handler UpDownActionHandler) error {
+	if _, err := s.nc.Subscribe(InternalSubject, runAction(handler)); err != nil {
+		return err
+	}
+	return nil
+}
+
+func runAction(handler UpDownActionHandler) func(msg *nats.Msg) {
+	return func(msg *nats.Msg) {
 		var request pbAct.ActionRequest
 		if err := proto.Unmarshal(msg.Data, &request); err != nil {
 			log.Println(err)
@@ -86,8 +88,5 @@ func (s *Client) ClamSharedAction(handler UpDownActionHandler) error {
 
 		log.Println("Request:", request.String())
 		handler(&request)
-	}); err != nil {
-		return err
 	}
-	return nil
 }

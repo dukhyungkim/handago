@@ -22,8 +22,8 @@ func main() {
 		log.Panicln(err)
 	}
 
-	if !opts.Shared && opts.Company == "" {
-		log.Println("--shared or --company must be set")
+	if !opts.Shared && opts.Company == "" && !opts.Internal {
+		log.Println("--shared, --company or --internal must be set")
 		return
 	}
 
@@ -60,6 +60,13 @@ func main() {
 
 	if opts.Company != "" {
 		err = streamClient.ClamCompanyAction(opts.Company, dockerHandler.HandleUpDownAction)
+		if err != nil {
+			log.Panicln(err)
+		}
+	}
+
+	if opts.Internal {
+		err = streamClient.ClamInternalAction(dockerHandler.HandleUpDownAction)
 		if err != nil {
 			log.Panicln(err)
 		}
