@@ -122,25 +122,52 @@ func (h *Handler) prepareTemplate(templateParam *model.DeployTemplateParam) (*by
 	return &tplBuffer, nil
 }
 
-func (h *Handler) executeDockerCompose(templateParam *model.DeployTemplateParam, tplBuffer *bytes.Buffer, actionType pbAct.ActionType) (string, error) {
+func (h *Handler) executeDockerCompose(templateParam *model.DeployTemplateParam, templateContents *bytes.Buffer, actionType pbAct.ActionType) (string, error) {
+	dirName := fmt.Sprintf("%s_%s", templateParam.Company, templateParam.Name)
+	if templateParam.Company == "" {
+		dirName = templateParam.Name
+	}
+
+	defer func() {
+		err := os.Chdir(os.TempDir())
+		if err != nil {
+			log.Println(err)
+		}
+		err = os.RemoveAll(dirName)
+		if err != nil {
+			log.Println(err)
+		}
+	}()
+
 	var err error
-	tplPath := fmt.Sprintf("/tmp/%s_%s.yaml", templateParam.Company, templateParam.Name)
-	err = os.WriteFile(tplPath, tplBuffer.Bytes(), 0600)
+	err = os.Chdir(os.TempDir())
+	if err != nil {
+		log.Println(err)
+		return "", err
+	}
+	err = os.MkdirAll(dirName, os.ModePerm)
+	if err != nil {
+		log.Println(err)
+		return "", err
+	}
+	err = os.Chdir(dirName)
 	if err != nil {
 		log.Println(err)
 		return "", err
 	}
 
-	const cmdDocker = "docker"
+	err = os.WriteFile("docker-compose.yml", templateContents.Bytes(), 0600)
+	if err != nil {
+		log.Println(err)
+		return "", err
+	}
 
 	var output []byte
 	switch actionType {
 	case pbAct.ActionType_UP:
-		output, err = exec.Command(cmdDocker, "compose", "-f", tplPath, "up", "-d").CombinedOutput()
-
+		output, err = exec.Command("docker", "compose", "up", "-d").CombinedOutput()
 	case pbAct.ActionType_DOWN:
-		output, err = exec.Command(cmdDocker, "compose", "-f", tplPath, "down").CombinedOutput()
-
+		output, err = exec.Command("docker", "compose", "down").CombinedOutput()
 	default:
 		return "", fmt.Errorf("unknown action type: %s", actionType)
 	}
@@ -152,20 +179,14 @@ func (h *Handler) executeDockerCompose(templateParam *model.DeployTemplateParam,
 
 	time.Sleep(5 * time.Second)
 
-	output, err = exec.Command(cmdDocker, "compose", "-f", tplPath, "ps").CombinedOutput()
+	output, err = exec.Command("docker", "compose", "ps").CombinedOutput()
 	if err != nil {
 		errWithOutput := makeErrWithOutput(output, err)
 		log.Println(errWithOutput)
 		return "", errWithOutput
 	}
 
-	err = os.Remove(tplPath)
-	if err != nil {
-		log.Println(err)
-		return "", err
-	}
-
-	return string(output), err
+	return string(output), nil
 }
 
 func (h *Handler) sendDeployResponse(response *pbAct.ActionResponse) {
