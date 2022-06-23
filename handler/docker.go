@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"handago/common"
 	"handago/config"
@@ -12,6 +13,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	pbAct "github.com/dukhyungkim/libharago/gen/go/proto/action"
@@ -129,30 +131,30 @@ func (h *Handler) executeDockerCompose(templateParam *model.DeployTemplateParam,
 		return "", err
 	}
 
-	const cmdDockerCompose = "docker-compose"
+	const cmdDocker = "docker"
 
 	var output []byte
 	switch actionType {
 	case pbAct.ActionType_UP:
-		output, err = exec.Command(cmdDockerCompose, "-f", tplPath, "up", "-d").CombinedOutput()
+		output, err = exec.Command(cmdDocker, "compose", "-f", tplPath, "up", "-d").CombinedOutput()
 
 	case pbAct.ActionType_DOWN:
-		output, err = exec.Command(cmdDockerCompose, "-f", tplPath, "down").CombinedOutput()
+		output, err = exec.Command(cmdDocker, "compose", "-f", tplPath, "down").CombinedOutput()
 
 	default:
 		return "", fmt.Errorf("unknown action type: %s", actionType)
 	}
 	if err != nil {
-		errWithOutput := fmt.Errorf("%s\n\n%v", string(output), err)
+		errWithOutput := makeErrWithOutput(output, err)
 		log.Println(errWithOutput)
 		return "", errWithOutput
 	}
 
 	time.Sleep(5 * time.Second)
 
-	output, err = exec.Command(cmdDockerCompose, "-f", tplPath, "ps").CombinedOutput()
+	output, err = exec.Command(cmdDocker, "compose", "-f", tplPath, "ps").CombinedOutput()
 	if err != nil {
-		errWithOutput := fmt.Errorf("%s\n\n%v", string(output), err)
+		errWithOutput := makeErrWithOutput(output, err)
 		log.Println(errWithOutput)
 		return "", errWithOutput
 	}
@@ -171,4 +173,16 @@ func (h *Handler) sendDeployResponse(response *pbAct.ActionResponse) {
 		log.Println(err)
 		return
 	}
+}
+
+func makeErrWithOutput(output []byte, err error) error {
+	if len(output) == 0 {
+		return err
+	}
+
+	sb := strings.Builder{}
+	sb.Write(output)
+	sb.WriteString("\n")
+	sb.WriteString(err.Error())
+	return errors.New(sb.String())
 }
