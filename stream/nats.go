@@ -18,6 +18,7 @@ const (
 	SharedSubject          = "harago.shared.action"
 	CompanySubject         = "harago.company.action"
 	InternalSubject        = "harago.internal.action"
+	ExternalSubject        = "harago.external.action"
 	SpecificCompanySubject = "harago.%s.action"
 )
 
@@ -73,6 +74,13 @@ func (s *Client) ClamSharedAction(handler UpDownActionHandler) error {
 
 func (s *Client) ClamInternalAction(handler UpDownActionHandler) error {
 	if _, err := s.nc.Subscribe(InternalSubject, runAction(handler)); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *Client) ClamExternalAction(handler UpDownActionHandler) error {
+	if _, err := s.nc.Subscribe(ExternalSubject, runAction(handler)); err != nil {
 		return err
 	}
 	return nil

@@ -8,6 +8,7 @@ type Options struct {
 	Company    string `long:"company" description:"use company subscriber"`
 	Shared     bool   `long:"shared" description:"use shared subscriber"`
 	Internal   bool   `long:"internal" description:"use internal subscriber"`
+	External   bool   `long:"external" description:"use external subscriber"`
 	Adapter    string `long:"adapter" description:"choose adapter type"`
 	Host       string `long:"host" description:"host url"`
 	Base       string `long:"base" description:"base path"`
